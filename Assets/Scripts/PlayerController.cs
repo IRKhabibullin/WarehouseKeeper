@@ -30,11 +30,11 @@ public class PlayerController : MonoBehaviour
         HouseController house = other.gameObject.GetComponentInParent<HouseController>();
         if (other.tag == releaseAreaTag)
         {
-            resourceTransferCoroutine = TakeResources(house);
+            resourceTransferCoroutine = TakeResourcesCoroutine(house);
         }
         else if (other.tag == receiveAreaTag)
         {
-            resourceTransferCoroutine = PutResources(house);
+            resourceTransferCoroutine = PutResourcesCoroutine(house);
         }
         StartCoroutine(resourceTransferCoroutine);
     }
@@ -71,7 +71,7 @@ public class PlayerController : MonoBehaviour
     /// Coroutine to start putting resources into house.
     /// </summary>
     /// <returns></returns>
-    private IEnumerator PutResources(HouseController house)
+    private IEnumerator PutResourcesCoroutine(HouseController house)
     {
         while (backpack.Count > 0)
         {
@@ -101,7 +101,7 @@ public class PlayerController : MonoBehaviour
     /// Coroutine to start taking resources from house.
     /// </summary>
     /// <returns></returns>
-    private IEnumerator TakeResources(HouseController house)
+    private IEnumerator TakeResourcesCoroutine(HouseController house)
     {
         while (backpack.Count < backpackMaxSize)
         {
@@ -131,6 +131,8 @@ public class PlayerController : MonoBehaviour
         float startTime = Time.time;
         while (Vector3.SqrMagnitude(startPosition - finishPosition) > 0.001)
         {
+            if (resource == null)
+                yield break;
             resource.transform.localPosition = Vector3.Lerp(startPosition, finishPosition, Mathf.Pow((Time.time - startTime), 0.2f));
             yield return new WaitForSeconds(0.01f);
         }
