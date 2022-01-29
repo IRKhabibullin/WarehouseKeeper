@@ -37,7 +37,7 @@ public class Storage
             bool hasResource = false;
             for (int i = Count - 1; i >= 0; i--)
             {
-                if (resources[i].props.tag == requiredResource)
+                if (resources[i].props.tag == requiredResource && !resources[i].isTransfering)
                 {
                     resourcesIndexes.Add(i);
                     supplies.Add(resources[i]);
@@ -53,17 +53,27 @@ public class Storage
         return supplies;
     }
 
-    public Vector3 CalculateNewResourcePosition()
-    {
-        return transferPoint.position + Vector3.up * Count / 2;
-    }
-
-    public void Put(Resource resource)
+    public IEnumerator Put(Resource resource)
     {
         resource.resourceObject.transform.parent = storageObject.transform;
-        resource.resourceObject.transform.position = CalculateNewResourcePosition();
-        resource.resourceObject.transform.rotation = transferPoint.rotation;
+        resource.isTransfering = true;
+
+        Vector3 finalPosition = transferPoint.localPosition + Vector3.up * Count / 2;
         resources.Add(resource);
+
+        Vector3 startPosition = resource.resourceObject.transform.localPosition;
+        Quaternion startRotation = resource.resourceObject.transform.localRotation;
+        float startTime = Time.time;
+        while (resource.resourceObject.transform.localPosition != finalPosition)
+        {
+            if (resource == null)
+                yield break;
+            var delta = Mathf.Pow((Time.time - startTime), 0.2f);
+            resource.resourceObject.transform.localPosition = Vector3.Lerp(startPosition, finalPosition, delta);
+            resource.resourceObject.transform.localRotation = Quaternion.Lerp(startRotation, transferPoint.localRotation, delta);
+            yield return new WaitForSeconds(0.01f);
+        }
+        resource.isTransfering = false;
     }
 }
 
@@ -79,6 +89,7 @@ public class Resource
         this.props = property;
         resourceObject.GetComponent<MeshRenderer>().material = props.material;
         resourceObject.tag = props.tag.ToString();
+        isTransfering = false;
     }
 }
 
@@ -96,7 +107,7 @@ public class ResourceProperty
     public Material material;
 }
 
-public class HouseController : MonoBehaviour
+public class WarehouseController : MonoBehaviour
 {
     [SerializeField] private Storage productionStorage;
     [SerializeField] private Storage supplyStorage;
@@ -134,15 +145,14 @@ public class HouseController : MonoBehaviour
     }
 
     /// <summary>
-    /// Receive resource from player, who stands in receive area and add it to house's supply storage
+    /// Receive resource from player, who stands in receive area and add it to warehouse's supply storage
     /// </summary>
     /// <returns></returns>
     public bool ReceiveResource(Resource resource)
     {
         if (supplyStorage.Count == supplyStorage.maxCapacity)
             return false;
-        StartCoroutine(PutResourceCoroutine(supplyStorage, resource.resourceObject));
-        supplyStorage.Put(resource);
+        StartCoroutine(supplyStorage.Put(resource));
         return true;
     }
     #endregion
@@ -164,26 +174,9 @@ public class HouseController : MonoBehaviour
             }
             foreach (var item in supplies)
                 Destroy(item.resourceObject);
-            Resource resource = new Resource(Instantiate(resourcePrefab), productProperty);
-            productionStorage.Put(resource);
+            Resource resource = new Resource(Instantiate(resourcePrefab, transform), productProperty);
+            StartCoroutine(productionStorage.Put(resource));
             yield return new WaitForSeconds(resourceProductionTime);
-        }
-    }
-
-    private IEnumerator PutResourceCoroutine(Storage storage, GameObject resource)
-    {
-        Vector3 startPosition = resource.transform.position;
-        Quaternion startRotation = resource.transform.rotation;
-        Vector3 finishPosition = storage.CalculateNewResourcePosition();
-        float startTime = Time.time;
-        while (Vector3.SqrMagnitude(startPosition - finishPosition) > 0.001)
-        {
-            if (resource == null)
-                yield break;
-            var delta = Mathf.Pow((Time.time - startTime), 0.2f);
-            resource.transform.position = Vector3.Lerp(startPosition, finishPosition, delta);
-            resource.transform.rotation = Quaternion.Lerp(startRotation, storage.transferPoint.rotation, delta);
-            yield return new WaitForSeconds(0.01f);
         }
     }
 }
