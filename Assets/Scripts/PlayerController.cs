@@ -10,11 +10,17 @@ public class PlayerController : MonoBehaviour
     public string receiveAreaTag;
     public string releaseAreaTag;
     public GameObject backpackObject;
-    public List<GameObject> backpack;
+    public Transform transferPoint;
+    public List<Resource> backpack;
     public int backpackMaxSize;
     public float resourceTransferTime;
 
     private IEnumerator resourceTransferCoroutine;
+
+    private void Start()
+    {
+        backpack = new List<Resource>();
+    }
 
     private void OnDestroy()
     {
@@ -78,7 +84,7 @@ public class PlayerController : MonoBehaviour
             int acceptableResourceIndex = -1;
             for (int i = backpack.Count - 1; i >= 0; i--)
             {
-                if (house.acceptableResources.Contains(backpack[i].tag))
+                if (house.acceptableResources.Contains(backpack[i].props.tag))
                 {
                     acceptableResourceIndex = i;
                     break;
@@ -105,7 +111,7 @@ public class PlayerController : MonoBehaviour
     {
         while (backpack.Count < backpackMaxSize)
         {
-            GameObject resource = house.ReleaseResource();
+            Resource resource = house.ReleaseResource();
             // don't stop coroutine when house doesn't have resources. It can produce new resource over time
             if (resource != null)
             {
@@ -116,24 +122,26 @@ public class PlayerController : MonoBehaviour
         yield break;
     }
 
-    private void PutIntoBackpack(GameObject resource)
+    private void PutIntoBackpack(Resource resource)
     {
-        Vector3 itemPosition = new Vector3(-0.2f, 0.9f + 0.5f * backpack.Count, 0);
-        resource.transform.parent = backpackObject.transform;
-        resource.transform.localRotation = Quaternion.identity;
-        StartCoroutine(PutResourceCoroutine(resource, itemPosition, Quaternion.identity));
+        Vector3 itemPosition = transferPoint.localPosition + Vector3.up * backpack.Count / 4;
+        resource.resourceObject.transform.parent = backpackObject.transform;
+        StartCoroutine(PutResourceCoroutine(resource.resourceObject, itemPosition, Quaternion.identity));
         backpack.Add(resource);
     }
 
     private IEnumerator PutResourceCoroutine(GameObject resource, Vector3 finishPosition, Quaternion finishRotation)
     {
         Vector3 startPosition = resource.transform.localPosition;
+        Quaternion startRotation = resource.transform.localRotation;
         float startTime = Time.time;
         while (Vector3.SqrMagnitude(startPosition - finishPosition) > 0.001)
         {
             if (resource == null)
                 yield break;
-            resource.transform.localPosition = Vector3.Lerp(startPosition, finishPosition, Mathf.Pow((Time.time - startTime), 0.2f));
+            var delta = Mathf.Pow((Time.time - startTime), 0.2f);
+            resource.transform.localPosition = Vector3.Lerp(startPosition, finishPosition, delta);
+            resource.transform.localRotation = Quaternion.Lerp(startRotation, finishRotation, delta);
             yield return new WaitForSeconds(0.01f);
         }
     }

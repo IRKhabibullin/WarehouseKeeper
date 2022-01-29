@@ -7,19 +7,19 @@ using UnityEngine;
 [Serializable]
 public class Storage
 {
-    private List<GameObject> resources;
+    private List<Resource> resources;
     [SerializeField] private GameObject storageObject;
     public int maxCapacity;
     public Transform transferPoint;
 
     public Storage()
     {
-        resources = new List<GameObject>();
+        resources = new List<Resource>();
     }
 
     public int Count { get { return resources.Count; } }
 
-    public GameObject Pop()
+    public Resource Pop()
     {
         if (Count == 0)
             return null;
@@ -28,16 +28,16 @@ public class Storage
         return resource;
     }
 
-    public List<GameObject> GetSuppliesForProduction(List<string> recipe)
+    public List<Resource> GetSuppliesForProduction(List<ResourceProperty.Tag> recipe)
     {
         List<int> resourcesIndexes = new List<int>();
-        List<GameObject> supplies = new List<GameObject>();
+        List<Resource> supplies = new List<Resource>();
         foreach (var requiredResource in recipe)
         {
             bool hasResource = false;
             for (int i = Count - 1; i >= 0; i--)
             {
-                if (resources[i].tag == requiredResource)
+                if (resources[i].props.tag == requiredResource)
                 {
                     resourcesIndexes.Add(i);
                     supplies.Add(resources[i]);
@@ -58,11 +58,42 @@ public class Storage
         return transferPoint.position + Vector3.up * Count / 2;
     }
 
-    public void Put(GameObject resource)
+    public void Put(Resource resource)
     {
-        resource.transform.parent = storageObject.transform;
+        resource.resourceObject.transform.parent = storageObject.transform;
+        resource.resourceObject.transform.position = CalculateNewResourcePosition();
+        resource.resourceObject.transform.rotation = transferPoint.rotation;
         resources.Add(resource);
     }
+}
+
+public class Resource
+{
+    public GameObject resourceObject;
+    public bool isTransfering;
+    public ResourceProperty props;
+
+    public Resource(GameObject resource, ResourceProperty property)
+    {
+        resourceObject = resource;
+        this.props = property;
+        resourceObject.GetComponent<MeshRenderer>().material = props.material;
+        resourceObject.tag = props.tag.ToString();
+    }
+}
+
+[Serializable]
+public class ResourceProperty
+{
+    public enum Tag
+    {
+        Resource1,
+        Resource2,
+        Resource3
+    }
+
+    public Tag tag;
+    public Material material;
 }
 
 public class HouseController : MonoBehaviour
@@ -70,10 +101,10 @@ public class HouseController : MonoBehaviour
     [SerializeField] private Storage productionStorage;
     [SerializeField] private Storage supplyStorage;
 
-    public List<string> acceptableResources;
+    public List<ResourceProperty.Tag> acceptableResources;
     public float resourceProductionTime;
     public GameObject resourcePrefab;
-    public string resourceTag;
+    public ResourceProperty productProperty;
     private IEnumerator resourceProductionCoroutine;
 
     public TextMeshProUGUI debugText;
@@ -97,7 +128,7 @@ public class HouseController : MonoBehaviour
     /// Release resource from production storage to player, who stands in release area
     /// </summary>
     /// <returns></returns>
-    public GameObject ReleaseResource()
+    public Resource ReleaseResource()
     {
         return productionStorage.Pop();
     }
@@ -106,11 +137,11 @@ public class HouseController : MonoBehaviour
     /// Receive resource from player, who stands in receive area and add it to house's supply storage
     /// </summary>
     /// <returns></returns>
-    public bool ReceiveResource(GameObject resource)
+    public bool ReceiveResource(Resource resource)
     {
         if (supplyStorage.Count == supplyStorage.maxCapacity)
             return false;
-        StartCoroutine(PutResourceCoroutine(supplyStorage, resource));
+        StartCoroutine(PutResourceCoroutine(supplyStorage, resource.resourceObject));
         supplyStorage.Put(resource);
         return true;
     }
@@ -122,25 +153,19 @@ public class HouseController : MonoBehaviour
         {
             if (productionStorage.Count >= productionStorage.maxCapacity)
             {
-                debugText.text = "Storage is full";
                 yield return new WaitForSeconds(resourceProductionTime);
                 continue;
             }
             var supplies = supplyStorage.GetSuppliesForProduction(acceptableResources);
             if (supplies == null)
             {
-                debugText.text = "No resources";
                 yield return new WaitForSeconds(0.1f);
                 continue;
             }
             foreach (var item in supplies)
-                Destroy(item);
-            GameObject resource = Instantiate(resourcePrefab);
-            resource.tag = resourceTag;
-            resource.transform.position = productionStorage.CalculateNewResourcePosition();
-            resource.transform.rotation = productionStorage.transferPoint.rotation;
+                Destroy(item.resourceObject);
+            Resource resource = new Resource(Instantiate(resourcePrefab), productProperty);
             productionStorage.Put(resource);
-            debugText.text = "Production timeout";
             yield return new WaitForSeconds(resourceProductionTime);
         }
     }
