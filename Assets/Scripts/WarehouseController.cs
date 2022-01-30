@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -55,7 +56,7 @@ public class Storage
             if (!hasResource)
                 return null;
         }
-        foreach (int i in resourcesIndexes)
+        foreach (int i in resourcesIndexes.OrderByDescending(x => x))
             resources.RemoveAt(i);
         return supplies;
     }
