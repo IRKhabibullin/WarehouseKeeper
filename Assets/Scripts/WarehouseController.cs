@@ -23,9 +23,16 @@ public class Storage
     {
         if (Count == 0)
             return null;
-        var resource = resources[Count - 1];
-        resources.RemoveAt(Count - 1);
-        return resource;
+        for (int i = Count - 1; i >= 0; i--)
+        {
+            if (!resources[i].isTransfering)
+            {
+                var resource = resources[i];
+                resources.RemoveAt(i);
+                return resource;
+            }
+        }
+        return null;
     }
 
     public List<Resource> GetSuppliesForProduction(List<ResourceProperty.Tag> recipe)
@@ -66,8 +73,11 @@ public class Storage
         float startTime = Time.time;
         while (resource.resourceObject.transform.localPosition != finalPosition)
         {
-            if (resource == null)
+            if (resource.resourceObject == null)
+            {
+                resource.isTransfering = false;
                 yield break;
+            }
             var delta = Mathf.Pow((Time.time - startTime), 0.2f);
             resource.resourceObject.transform.localPosition = Vector3.Lerp(startPosition, finalPosition, delta);
             resource.resourceObject.transform.localRotation = Quaternion.Lerp(startRotation, transferPoint.localRotation, delta);
@@ -118,7 +128,7 @@ public class WarehouseController : MonoBehaviour
     public ResourceProperty productProperty;
     private IEnumerator resourceProductionCoroutine;
 
-    public TextMeshProUGUI debugText;
+    public TextMeshProUGUI statusText;
 
     private void Start()
     {
@@ -163,12 +173,14 @@ public class WarehouseController : MonoBehaviour
         {
             if (productionStorage.Count >= productionStorage.maxCapacity)
             {
+                statusText.text = $"{gameObject.name}: no space";
                 yield return new WaitForSeconds(resourceProductionTime);
                 continue;
             }
             var supplies = supplyStorage.GetSuppliesForProduction(acceptableResources);
             if (supplies == null)
             {
+                statusText.text = $"{gameObject.name}: no supplies";
                 yield return new WaitForSeconds(0.1f);
                 continue;
             }
@@ -176,6 +188,7 @@ public class WarehouseController : MonoBehaviour
                 Destroy(item.resourceObject);
             Resource resource = new Resource(Instantiate(resourcePrefab, transform), productProperty);
             StartCoroutine(productionStorage.Put(resource));
+            statusText.text = $"{gameObject.name}: ok";
             yield return new WaitForSeconds(resourceProductionTime);
         }
     }
