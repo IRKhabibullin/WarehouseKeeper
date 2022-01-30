@@ -126,6 +126,12 @@ public class PlayerController : MonoBehaviour
             if (resourceAccepted)
             {
                 player.backpack.RemoveAt(acceptableResourceIndex);
+                if (player.backpack.Count > acceptableResourceIndex)
+                    for (int i = acceptableResourceIndex; i < player.backpack.Count; i++)
+                    {
+                        Vector3 newResourcePosition = player.backpack[i].resourceObject.transform.localPosition - Vector3.up / 4;
+                        StartCoroutine(StackUpResource(player.backpack[i].resourceObject, newResourcePosition));
+                    }
             }
             yield return new WaitForSeconds(player.resourceTransferTime);
         }
@@ -149,5 +155,18 @@ public class PlayerController : MonoBehaviour
             yield return new WaitForSeconds(player.resourceTransferTime);
         }
         yield break;
+    }
+
+    private IEnumerator StackUpResource(GameObject resourceObject, Vector3 newPosition)
+    {
+        Vector3 startPosition = resourceObject.transform.localPosition;
+        float startTime = Time.time;
+        while (resourceObject.transform.localPosition != newPosition)
+        {
+            if (resourceObject == null)
+                yield break;
+            resourceObject.transform.localPosition = Vector3.Lerp(startPosition, newPosition, (Time.time - startTime) * 10);
+            yield return new WaitForSeconds(0.01f);
+        }
     }
 }
